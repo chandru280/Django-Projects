@@ -60,13 +60,9 @@ def at_request_exception(sender, **kwargs):
 
 
 
+
+
 """ Authentication signals """
-
-
-
-
-# Logger setup
-logger = logging.getLogger(__name__)
 
 @receiver(user_logged_in)
 def user_logged_in_handler(sender, request, user, **kwargs):
@@ -87,11 +83,6 @@ def user_logged_in_handler(sender, request, user, **kwargs):
 
 
 
-
-
-# Logger setup
-logger = logging.getLogger(__name__)
-
 @receiver(user_logged_out)
 def user_logged_out_handler(sender, request, user, **kwargs):
     """
@@ -104,10 +95,6 @@ def user_logged_out_handler(sender, request, user, **kwargs):
     print(f"User {user.username} logged out.")
 
 
-
-
-# Logger setup
-logger = logging.getLogger(__name__)
 
 @receiver(user_login_failed)
 def user_login_failed_handler(sender, credentials, request, **kwargs):
@@ -127,17 +114,7 @@ def user_login_failed_handler(sender, credentials, request, **kwargs):
 
 
 
-
-
-
-
-
-
 """ Migrations """
-
-
-# Create logger to see output
-logger = logging.getLogger(__name__)
 
 # This runs BEFORE migrations are applied
 @receiver(pre_migrate)
@@ -154,10 +131,10 @@ def after_migrations(sender, **kwargs):
 
 
 
+
 """Management commands"""
 
 # 1. Before a Student instance is created
-
 @receiver(pre_init, sender=Student)
 def before_student_created(sender, *args, **kwargs):
     print(" [pre_init] About to create a Student instance!")
