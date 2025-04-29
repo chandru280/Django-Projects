@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - Marks Management System{% endblock %}
+
+{% block header %}Welcome to the Marks Management System{% endblock %}
+
+{% block content %}
+<div class="form-container mb-4">
+    {% if user.is_superuser %}
+        <!-- Form for Academic Year -->
+
+        <form method="post" class="d-flex align-items-center" action="{% url 'academicyear' %}">
+            {% csrf_token %}
+            {{ form.year.label }}
+            <div class="mb-0 me-2" style="border: 1px solid blue">
+                 <span> {{ form.year }}</span>
+                {% if form.year.errors %}
+                    <div class="text-danger">{{ form.year.errors }}</div>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary">Create</button>
+        </form>
+
+
+        <form method="POST" class="d-flex align-items-center" action="{% url 'home' %}">
+            {% csrf_token %}
+            <input type="hidden" name="form_type" value="academic_year_form"> <!-- Hidden field to differentiate form -->
+            <label for="academic_year" class="me-2">Select Academic Year:</label>
+            <select name="academic_year" id="academic_year" class="form-select" onchange="this.form.submit();">
+                {% for year in academic_years %}
+                    <option value="{{ year.year }}" {% if year.year == current_year %} selected {% endif %}>{{ year.year }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    {% endif %}
+</div>
+
+<div>
+    <h2 class="mt-4">Students for {{ current_year }}</h2>
+
+    <!-- Form for Standard -->
+    <form method="POST" action="{% url 'home' %}" class="d-flex align-items-center ms-3">
+        {% csrf_token %}
+        <input type="hidden" name="form_type" value="standard_form"> <!-- Hidden field to differentiate form -->
+        <label for="standard" class="me-2">Select Standard:</label>
+        <select name="standard" id="standard" class="form-select" onchange="this.form.submit();">
+            <option value="">--- Select Standard ---</option> <!-- Optional placeholder -->
+            {% for data in standard %}
+                <option value="{{ data.name }}" {% if data.standard == selected_standard %} selected {% endif %}>{{ data.name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    {% if message %}
+        <div class="alert alert-warning mt-3">{{ message }}</div>
+    {% elif students %}
+
+    <div style="display: flex; gap: 10px;">
+        <div style="width: 500px; height:100px; border:1px solid blue; border-radius: 10px;"> Total No.Of Students : {{ students_count }}</div>
+        <div style="width: 500px; height:100px; border:1px solid blue; border-radius: 10px;">Total No.On Test : {{ test_count }}</div>
+        <div style="width: 500px; height:100px; border:1px solid blue; border-radius: 10px;">a</div>
+        <div style="width: 500px;height:100px; border:1px solid blue; border-radius: 10px;">a</div>
+    </div>
+    {% else %}
+        <div class="alert alert-info mt-3">No students available for the selected standard.</div>
+    {% endif %}
+</div>
+
+
+
+
+{% endblock %}

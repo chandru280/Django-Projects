@@ -1,0 +1,606 @@
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.db import IntegrityError 
+from django.shortcuts import get_object_or_404, render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from marks.forms import *
+from marks.models import *
+
+# from .decorators import admin_required 
+from .decorators import can_add_required, can_update_required, can_delete_required
+from django.http import HttpResponseForbidden
+from django.contrib.auth.hashers import make_password
+
+from django.contrib import messages
+
+ 
+
+def register(request):
+    if request.method == 'POST':
+        form = Registrationform(request.POST)
+        if form.is_valid():
+            try:
+                user = form.save(commit=False)
+                user.save()
+                messages.success(request, 'Registration completed successfully')
+                return redirect('login')
+            except IntegrityError as e:
+                    
+                    error_message = "Error: " + str(e)
+                    return render(request, 'authendication/signup.html', {'form': form, 'error_message': error_message})
+
+    else:
+        form = Registrationform()
+    return render(request, 'authendication/signup.html', {'form': form})
+
+
+ 
+
+def user_login(request):
+    if request.user.is_authenticated:
+        return render(request, 'authendication/login.html', {'already_logged_in': True})
+
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        next_url = request.POST.get('next', 'home')   
+        print('next_url', next_url)
+        
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            messages.success(request, 'Login successful')
+
+            if next_url and next_url != 'home':
+                return redirect(next_url)
+
+            if user.role == 'ADMIN' or user.role == 'STAFF':
+                return redirect('home')
+            elif user.role == 'STUDENT':
+                student = get_object_or_404(Student, roll_number=user)
+                return redirect('student_detail', student_id=student.id)
+            else:
+                return redirect('home')
+        else:
+            messages.error(request, 'Invalid username or password')
+            return render(request, 'authendication/login.html', {
+                'error_message': 'Invalid username or password.',
+                'next': next_url   
+            })
+    
+    next_url = request.GET.get('next', '')  
+    return render(request, 'authendication/login.html', {'next': next_url})
+
+
+
+@login_required
+def user_logout(request):
+    logout(request)
+    messages.success(request, 'Logout successful')
+    return redirect('login')
+
+
+
+@login_required
+def manage_user_permissions(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden("You do not have permission to access this page.")
+    elif request.method == 'POST':
+        for user in UserForm.objects.all():
+            user.can_add = f'user_{user.id}_can_add' in request.POST
+            user.can_update = f'user_{user.id}_can_update' in request.POST
+            user.can_delete = f'user_{user.id}_can_delete' in request.POST
+            user.save()
+        messages.success(request, 'Permission modified for the use successful')
+        return redirect('manage_user_permissions')
+    
+    users = UserForm.objects.all()
+    return render(request, 'authendication/manage_user_permissions.html', {'users': users})
+
+
+
+def academicyear(request):
+    if request.method == 'POST':
+        form = AcademicYearForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Academic year created successful')
+            return redirect('home')
+    else:
+        form = AcademicYearForm()
+    return redirect('home')
+ 
+
+@login_required
+def home(request):
+    current_year = request.session.get('selected_academic_year')
+    academic_years = AcademicYear.objects.all()
+    sel_standard = request.COOKIES.get('selected_standard')
+    print('-----------------------')
+    print('sel_standard',sel_standard)
+    print('current_year',current_year)
+    if current_year is None:
+        academic_year = AcademicYear.objects.last()   
+        if academic_year:   
+            request.session['selected_academic_year'] = academic_year.year
+            current_year = academic_year.year   
+
+    form = AcademicYearForm()
+
+    if request.method == "POST":
+        form_type = request.POST.get('form_type')
+
+        if form_type == "academic_year_form":
+            selected_year = request.POST.get('academic_year')
+            request.session['selected_academic_year'] = selected_year
+            return redirect('home')
+
+        elif form_type == "standard_form":
+            selected_standard = request.POST.get('standard')
+            print('selected_standard',selected_standard)
+            if selected_standard:
+                response = redirect('home')
+                response.set_cookie('selected_standard', selected_standard,  max_age=30*24*60*60)
+                print('selected_standard ----',selected_standard)
+                return response
+            return redirect('home')
+
+
+    students = Student.objects.filter(academic_year__year=current_year, standard__name=sel_standard)
+    students_count = Student.objects.filter(academic_year__year=current_year, standard__name=sel_standard).count()
+    test_count = Testname.objects.filter(academic_year__year=current_year, standard__name=sel_standard).count()
+
+    last_test = Testname.objects.filter(standard__name=sel_standard).order_by('-id').first()
+
+    if last_test:
+        test_subjects = Testsubject.objects.filter(test_name=last_test)
+        print('test_subjects',test_subjects)
+        
+        total_students = 0
+        students_passed = 0
+
+        for subject in test_subjects:
+            total_students += subject.total_mark  
+            passed_students = Mark.objects.filter(
+                subject=subject,
+                marks__gte=subject.pass_mark
+            ).count()
+            print('passed_students',passed_students)
+            
+            students_passed += passed_students
+
+        if total_students > 0:
+            print('total_students',total_students)
+            print('students_passed',students_passed)
+            print('total_students',total_students)
+
+            pass_percentage = (students_passed / total_students) * 100
+        else:
+            pass_percentage = 0
+
+    # print('student   :',pass_percentage)
+    message = "Please select a standard." if not sel_standard else ""
+    print('message   :',message)
+    print('-----------------------')
+
+    standard = Standard.objects.all()
+    print('standard   :',standard)
+    print('-----------------------')
+    return render(request, 'home.html', {'test_count':test_count,'students_count':students_count,
+                                        'message':message,'standard':standard,'form':form,
+                                        'students': students, 'academic_years': academic_years, 'current_year': current_year})
+
+
+
+
+
+# @admin_required
+# @can_add_required
+def add_or_update_standard(request):
+    if request.method == 'POST':
+        if 'add_standard' in request.POST:
+            standard_form = StandardForm(request.POST)
+            if standard_form.is_valid():
+                standard_form.save()
+                messages.success(request, 'Standard created successfully.')
+                return redirect('standard_list')
+        elif 'add_subject' in request.POST:
+            subject_form = SubjectForm(request.POST)
+            if subject_form.is_valid():
+                subject_form.save()
+                messages.success(request, 'Subject created successfully.')
+                return redirect('create_standard')
+    else:
+        standard_form = StandardForm()
+        subject_form = SubjectForm()
+
+    return render(request, 'subject_standard/add_standard_with_subject.html', {
+        'standard_form': standard_form,
+        'subject_form': subject_form,
+    })
+
+
+
+def standard_list(request):
+    standards = Standard.objects.all()
+    return render(request, 'subject_standard/standard_list.html', {'standards': standards})
+
+
+def edit_standard(request, pk):
+    standard = get_object_or_404(Standard, pk=pk)
+    if request.method == 'POST':
+        form = StandardForm(request.POST, instance=standard)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Standard updated successfully.')
+            return redirect('subject_list_standard', standard_id=standard)
+    else:
+        form = StandardForm(instance=standard)
+    return render(request, 'subject_standard/add_standard_with_subject.html', {'standard_form': form})
+
+
+def delete_standard(request, standard_id):
+    standard = get_object_or_404(Standard, id=standard_id)
+    if request.method == 'POST':
+        standard.delete() 
+        messages.success(request, 'Standard deleted successful')
+        return redirect('standard_list')  
+    return redirect('standard_list')  
+
+
+def subject_list(request):
+    subjects = Subject.objects.all()
+    return render(request, 'subject_standard/subject_list.html', {'subjects': subjects})
+
+
+def edit_subject(request, pk):
+    subject = get_object_or_404(Subject, pk=pk)
+    update = True
+    if request.method == 'POST':
+        form = SubjectForm(request.POST, instance=subject)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Subject updated successfully.')
+            return redirect('subject_list')
+    else:
+        form = SubjectForm(instance=subject)
+    return render(request, 'subject_standard/add_standard_with_subject.html', {'subject_form': form, 'update':update})
+
+
+
+
+def subject_list_standard(request, standard_id):
+    standard = Standard.objects.get(pk=standard_id)
+    subjects = standard.subjects.all()  
+    print('--------------')
+    print('subjects',subjects)
+    return render(request, 'subject_standard/subject_list_standard.html', {
+        'standard': standard,
+        'subjects': subjects
+    })
+
+#Remove the subject from the standard
+def delete_subject(request, subject_id, standard_id):
+    subject = get_object_or_404(Subject, id=subject_id)
+    standard = get_object_or_404(Standard, id=standard_id)
+
+    if request.method == 'POST':
+        standard.subjects.remove(subject)   
+
+        messages.success(request, 'Subject removed from the standard successfully')
+        return redirect('standard_list')  
+    return redirect('standard_list')
+
+# Delete the entire subject
+def subject_delete(request, id):
+    subject = get_object_or_404(Subject, id=id)
+    if request.method == 'POST':
+        subject.delete() 
+        messages.success(request, 'Subject deleted successful')
+        return redirect('subject_list')   
+    return redirect('subject_list') 
+
+def create_testname_with_subjects(request):
+    current_year = request.session.get('selected_academic_year')   
+    if request.method == 'POST':
+        testname_form = TestnameForm(request.POST)
+        formset = TestsubjectFormSet(request.POST)
+        if testname_form.is_valid() and formset.is_valid():
+            testname = testname_form.save(commit=False)
+            academic_year = AcademicYear.objects.get(year=current_year)
+            testname.academic_year = academic_year
+            testname.save()
+            testsubjects = formset.save(commit=False)
+            for testsubject in testsubjects:
+                testsubject.test_name = testname
+                testsubject.save()
+            messages.success(request, 'Test created successful')
+            return redirect('create_testname_with_subjects')
+    else:
+        testname_form = TestnameForm()
+        formset = TestsubjectFormSet()
+
+    return render(request, 'subject_standard/add_test.html', {
+        'testname_form': testname_form,
+        'formset': formset,
+    })
+
+
+
+def fetch_subjects(request):
+    standard_id = request.GET.get('standard_id')
+    subjects = Subject.objects.filter(standard_id=standard_id).values('id', 'name')
+    return JsonResponse(list(subjects), safe=False)
+
+
+
+
+def add_student(request): 
+    current_year = request.session.get('selected_academic_year')   
+    if request.method == 'POST':
+        form = StudentForm(request.POST, request.FILES)
+        if form.is_valid(): 
+            student = form.save(commit=False)
+            academic_year = AcademicYear.objects.get(year=current_year)
+            student.academic_year = academic_year
+            student.save()
+            
+            # user = UserForm(
+            #     username=student.roll_number,
+            #     password=make_password(student.date_of_birth.strftime('%Y-%m-%d')),   
+            #     role='STUDENT',
+            #     email=student.email,
+            #     name=student.name,
+            # )
+            # user.save()
+            messages.success(request, 'Student created successful')
+            return redirect('student_list')
+    else:
+        form = StudentForm()
+    return render(request, 'student/add_student.html', {'form': form})
+
+
+
+def student_list(request, standard_id):
+    current_year = request.session.get('selected_academic_year')
+    students = Student.objects.filter(academic_year__year=current_year, standard_id=standard_id)
+    standard_id = Standard.objects.get(id=standard_id)
+    return render(request, 'student/student_list.html', {'students': students, 'standard_id':standard_id})
+
+
+
+def generate_register_numbers(request, standard_id):
+    current_year = request.session.get('selected_academic_year')
+    if request.method == 'GET':
+        start_register = request.GET.get('start_register')
+
+        start_register = int(start_register)
+        standard = get_object_or_404(Standard, id=standard_id)
+
+        students = Student.objects.filter(academic_year__year=current_year, standard=standard).order_by('name')
+        
+        if not students.exists():
+            messages.warning(request, "No students found in the selected standard.")
+            return redirect('student_list', standard_id=standard_id)
+
+        for idx, student in enumerate(students, start=start_register):
+            register_no = f"{idx:04d}"
+            student.register_no = register_no  
+            student.save()
+
+            if not UserForm.objects.filter(username=register_no).exists():
+                UserForm.objects.create(
+                    username=register_no,   
+                    name=student.name,  
+                    email=student.email,  
+                    image=student.image if student.image else 'default.jpg',  
+                    password=make_password(student.date_of_birth.strftime('%d%m%Y') if student.date_of_birth else register_no),  
+                    role='STUDENT',  
+                    contact=student.contact_number  
+                )
+        standard.status = True
+        standard.save()
+        messages.success(request, "Register numbers have been successfully generated.")
+        return redirect('student_list', standard_id=standard_id)
+    else:
+        return redirect('student_list', standard_id=standard_id)
+
+
+
+def student_detail(request, student_id):
+    student = get_object_or_404(Student, pk=student_id)
+    marks = Mark.objects.filter(student=student)
+    last_test = Testname.objects.last()  
+    
+    return render(request, 'student/student_detail.html', {
+        'student': student,
+        'marks': marks,
+        'last_test': last_test,
+    })
+
+
+
+def update_student(request, student_id, standard_id):
+    student = get_object_or_404(Student, pk=student_id)
+    if request.method == 'POST':
+        form = StudentForm(request.POST, request.FILES, instance=student)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Student Updated successfully')
+            return redirect('student_list', standard_id=standard_id)    
+    else:
+        form = StudentForm(instance=student)
+    return render(request, 'student/update_student.html', {'form': form, 'student': student})
+
+
+
+
+def delete_student(request, student_id, standard_id):
+    student = get_object_or_404(Student, pk=student_id)
+    if request.method == 'POST':
+        student.delete()
+        messages.success(request, 'Student deleted successfully')
+        return redirect('student_list', standard_id=standard_id)  
+    return redirect('student_list', standard_id=standard_id)
+
+
+
+def staff_add(request):
+    if request.method == 'POST':
+        form = StaffForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Staff created successful')
+            return redirect('staff_list')
+    else:
+        form = StaffForm()
+    return render(request, 'staff/staff_add.html', {'form': form})
+
+
+
+def staff_list(request):
+    staff = Staff.objects.all()
+    return render(request, 'staff/staff_list.html', {'staff': staff})
+
+
+
+def staff_detail(request, staff_id):
+    staff = get_object_or_404(Staff, pk=staff_id)
+    
+    return render(request, 'staff/staff_detail.html', {
+        'staff': staff,
+    
+    })
+
+
+def staff_update(request, staff_id):
+    staff = get_object_or_404(Staff, pk=staff_id)
+    if request.method == 'POST':
+        form = StaffForm(request.POST, request.FILES, instance=staff)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Staff updated successful')
+            return redirect('staff_list')
+    else:
+        form = StaffForm(instance=staff)
+    return render(request, 'staff/staff_update.html', {'form': form})
+
+
+
+def staff_delete(request, staff_id):
+    staff = get_object_or_404(Staff, pk=staff_id)
+    if request.method == 'POST':
+        staff.delete()
+        messages.success(request, 'Stadd deleted successful')
+        return redirect('staff_list')
+    return redirect('staff_list')
+ 
+
+def create_marks(request, student_id):
+    mark_forms = []
+    student = get_object_or_404(Student, id=student_id)
+    student_standard = student.standard
+    last_test = Testname.objects.filter(standard=student_standard).last()
+
+    if request.method == 'POST':
+        test_form = TestSelectionForm(request.POST, student=student)
+        if test_form.is_valid():
+            student = test_form.cleaned_data['student']
+            test = test_form.cleaned_data['test']
+            subjects = Testsubject.objects.filter(test_name=test)
+
+            for subject in subjects:
+                total_mark = subject.total_mark
+                pass_mark = subject.pass_mark
+                mark_form = MarkForm(request.POST, prefix=str(subject.id), subject=subject)
+                mark_form.initial['total_mark'] = total_mark
+                mark_form.initial['pass_mark'] = pass_mark
+                mark_forms.append(mark_form)
+
+            if all(mf.is_valid() for mf in mark_forms):
+                for mf in mark_forms:
+                    mark = mf.save(commit=False)
+                    mark.student = student
+                    mark.test = test
+                    mark.subject = Testsubject.objects.get(id=int(mf.prefix))
+                    mark.status = mf.initial.get('status')
+                    mark.save()
+                messages.success(request, 'Mark added successful')
+                return redirect('student_detail', student_id=student_id)
+
+            else:
+                print("Mark forms errors:", [mf.errors for mf in mark_forms])
+        else:
+            print("Test form errors:", test_form.errors)
+    else:
+        test_form = TestSelectionForm(initial={'student': student, 'test': last_test}, student=student)
+        subjects = Testsubject.objects.filter(test_name=last_test)
+        mark_forms = [MarkForm(prefix=str(subject.id), subject=subject) for subject in subjects]
+    
+    return render(request, 'subject_standard/mark_form.html', {
+        'test_form': test_form,
+        'mark_forms': mark_forms,
+    })
+
+
+
+
+def get_subjects(request):
+    test_id = request.GET.get('test')
+    subjects = Testsubject.objects.filter(test_name_id=test_id)
+    subject_data = [{'id': subject.id, 'subject': str(subject.subject)} for subject in subjects]
+    return JsonResponse({'subjects': subject_data})
+
+
+def update_mark(request, mark_id):
+    mark = get_object_or_404(Mark, pk=mark_id)
+    student = mark.student
+    test = mark.test
+    test_subject = mark.subject
+
+    if request.method == 'POST':
+        form = MarkFormupdate(request.POST, instance=mark, total_mark=test_subject.total_mark, pass_mark=test_subject.pass_mark)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Mark updated successful')
+            return redirect('student_detail', student_id=student.id)
+        else:
+            print(form.errors)  
+    else:
+        form = MarkFormupdate(instance=mark, total_mark=test_subject.total_mark, pass_mark=test_subject.pass_mark)
+
+    return render(request, 'subject_standard/mark_update.html', { 'form': form, 'student': student, 'test': test,  'mark': mark,})
+
+
+
+def mark_delete(request, id):
+    mark = get_object_or_404(Mark, id=id)
+    student_id = mark.student.id
+    if request.method == 'POST':
+        mark.delete()
+        messages.success(request, 'Mark deleted successful')
+        return redirect('student_detail', student_id=student_id)
+
+    return redirect('student_detail', student_id=student_id)
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Student Admin Pannel
+def stu_profile(request, id):
+    student = get_object_or_404(Student, id=id)
+    print(student)
+    return render(request, 'student_profile/profile.html', {'student':student})
+ 

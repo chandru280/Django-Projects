@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f8f9fa;
+        padding: 20px;
+    }
+
+    h2 {
+        color: #333;
+    }
+
+    .form-container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        margin-bottom: 30px;
+        width: 45%;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 50%;  
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .checkbox-item label {
+        margin-left: 10px;
+        font-weight: normal;
+    }
+
+    .btn {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%; /* Make the button full width */
+    }
+
+    .btn:hover {
+        background-color: #0056b3;
+    }
+
+    .error {
+        color: red;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
+    .form-wrapper {
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .alert {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 4px;
+        color: #155724;
+    }
+
+    /* Mobile view adjustments */
+    @media (max-width: 768px) {
+        .form-wrapper {
+            flex-direction: column;
+        }
+        .form-container {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+{% block header %}{% if update %}
+                    Update Subject
+                {% else %}
+Add Standard and Subject
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="form-wrapper">
+    <!-- Standard Form -->
+    <div class="form-container">
+        <form method="post">
+            {% csrf_token %}
+            <h3>Add Standard</h3>
+
+            <div class="form-group">
+                <label for="standard_name">Standard Name</label>
+                {{ standard_form.name }}
+                {% if standard_form.name.errors %}
+                    <div class="error">{{ standard_form.name.errors }}</div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="subjects">Subjects</label>
+                <div class="checkbox-group">
+                    {% for checkbox in standard_form.subjects %}
+                        <div class="checkbox-item">
+                            {{ checkbox.tag }}
+                            <label for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
+                        </div>
+                    {% endfor %}
+                </div>
+                {% if standard_form.subjects.errors %}
+                    <div class="error">{{ standard_form.subjects.errors }}</div>
+                {% endif %}
+            </div>
+
+            <button type="submit" name="add_standard" class="btn">Add Standard</button>
+        </form>
+    </div>
+
+    <!-- Subject Form -->
+    <div class="form-container">
+        <form method="post">
+            {% csrf_token %}
+            <h3>Add Subject</h3>
+
+            <div class="form-group">
+                <label for="{{ subject_form.name.id_for_label }}">Subject Name</label>
+                <input type="text" name="name" id="{{ subject_form.name.id_for_label }}" value="{{ subject_form.name.value|default:'' }}" required>
+                {% for error in subject_form.name.errors %}
+                    <div class="error">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <button type="submit" name="add_subject" class="btn">Add Subject</button>
+        </form>
+    </div>
+</div>
+
+
+{% endblock %}

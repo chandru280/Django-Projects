@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student List</title>
+</head>
+<body>
+    <h1>Students</h1>
+    <a href="{% url 'student_create' %}">Add New Student</a>
+    <ul>
+        {% for student in students %}
+            <li>
+                {{ student.name }} - {{ student.marks }}
+                <a href="{% url 'student_update' student.pk %}">Edit</a>
+                <a href="{% url 'student_delete' student.pk %}">Delete</a>
+            </li>
+        {% endfor %}
+    </ul>
+
+
+    {% if error%}
+   The exception error is : {{error}}
+   {% endif%}
+
+
+</body>
+</html>

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Student List{% endblock %}
+
+{% block extra_css %}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+        }
+        table th, table td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+        table th {
+            background-color: #007bff;
+            color: white;
+        }
+        table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .button {
+            padding: 6px 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .delete-button {
+            background-color: #dc3545;
+        }
+        .delete-button:hover {
+            background-color: #c82333;
+        }
+        form.search-form {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .search-input {
+            width: 80%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .search-button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .search-button:hover {
+            background-color: #218838;
+        }
+    </style>
+{% endblock %}
+
+{% block header %}Student List{% endblock %}
+
+{% block content %}
+     
+    {% if standard_id.status == False %}
+    <form method="get" action="{% url 'generate_register_numbers' standard_id.id %}">
+        <label for="start_register">Starting Register Number:</label>
+        <input type="number" id="start_register" name="start_register" min="1" required>
+        
+        <button type="submit">Generate Register Numbers</button>
+    </form>
+    {% endif %}
+    <!-- Search form -->
+    <!-- <form class="search-form" method="get" action="{% url 'student_list' standard_id %}">
+        <input type="text" name="query" class="search-input" placeholder="Search by name or email..." value="{{ request.GET.query }}">
+        <button type="submit" class="search-button">Search</button>
+    </form> -->
+    
+    <a href="{% url 'add_student' %}" class="button">Add Student</a>
+
+    <table>
+        <thead>
+            <tr>
+                <th>S.No</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Date of Birth</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in students %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td><a href="{% url 'student_detail' member.id %}">{{ member.name }}</a></td>
+                    <td>{{ member.email }}</td>
+                    <td>{{ member.date_of_birth }}</td>
+                    <td class="action-buttons">
+                         
+                        <button type="submit" class="button"><a href="{% url 'create_marks' member.id %}">Add Mark</a></button>
+                        <button type="submit" class="button"><a href="{% url 'update_student' member.id standard_id %}">Update</a></button>
+    
+                        <form method="post" action="{% url 'delete_student' member.id standard_id %}" onsubmit="return confirm('Are you sure you want to delete this staff member?');">
+                            {% csrf_token %}
+                            <button type="submit" class="button delete-button">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endblock %}

@@ -1,0 +1,11 @@
+<!-- send_message.html -->
+<form method="post" action="{% url 'send_message' %}">
+    {% csrf_token %}
+    <label for="phone">Phone Number:</label>
+    <input type="text" id="phone" name="phone" required>
+    
+    <label for="message">Message:</label>
+    <textarea id="message" name="message" required></textarea>
+    
+    <button type="submit">Send Message</button>
+</form>
