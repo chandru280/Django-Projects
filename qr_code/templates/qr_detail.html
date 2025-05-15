@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ qr.name }}'s Info</title>
+</head>
+<body>
+    <h1>{{ qr.name }}</h1>
+    <p><strong>Address:</strong> {{ qr.address }}</p>
+    <p><strong>Email:</strong> {{ qr.email }}</p>
+    <p><strong>Contact:</strong> {{ qr.contact }}</p>
+
+    {% if qr.extra_image %}
+        <h3>Image:</h3>
+        <img src="{{ qr.extra_image.url }}" width="300" alt="User Image">
+    {% endif %}
+</body>
+</html>
