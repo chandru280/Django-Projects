@@ -18,6 +18,18 @@ from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
+    path('admin/defender/', include('defender.urls')), 
     path('admin/', admin.site.urls),
     path('',include('querys.urls'))
 ]
+
+
+
+
+
+"""
+    Defender Documentation
+    https://django-defender.readthedocs.io/en/latest/index.html
+    https://github.com/jazzband/django-defender
+    
+"""
